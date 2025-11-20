@@ -1,8 +1,12 @@
 # anemll-thunderbolt-BFP
 
+Goal
+----
+The goal of this project is to test low-latency Thunderbolt 4/5 (TB4/TB5) communications by bypassing the TCP/IP stack on the receiver using BPF (Berkeley Packet Filter). This approach allows for precise latency measurements and reduced jitter by operating at the raw Ethernet frame level, avoiding kernel network stack overhead.
+
 Purpose
 -------
-This project contains a tool to test low-latency Thunderbolt 4/5 (TB4/TB5) networking links using UDP. It is designed to measure RTT (latency) and throughput, and to provide a low-jitter testing path by bypassing the kernel network stack when desired.
+This project contains a tool to test low-latency Thunderbolt 4/5 (TB4/TB5) networking links using UDP over Berkeley Packet Filter. It is designed to measure RTT (latency) and throughput, and to provide a low-jitter testing path by bypassing the kernel network stack when desired.
 
 Why BPF / libpcap?
 ------------------
@@ -74,6 +78,53 @@ Troubleshooting
 - If you see permission errors while using BPF/pcap mode, run with `sudo` or adjust pcap/device permissions.
 - If pcap filters are not matching traffic, check the interface name and the host IP used for filtering.
 - If RTT numbers look incorrect for batched ACKs, check the code TODO regarding the server selecting the correct send_ns for the batch; it may need refinement.
+
+Testing
+-------
+### Quick compilation test
+```bash
+clang++ -std=c++17 -O2 -pthread main.cpp -lpcap -o udp_tbolt_tester
+./udp_tbolt_tester  # Should display help message
+```
+
+### Loopback testing (localhost)
+**Note:** Server requires `sudo` for BPF/pcap mode. Client can use UDP mode (`-u`) without root.
+
+**Terminal 1 (Server):**
+```bash
+sudo ./udp_tbolt_tester -s -i lo0 -p 8888
+```
+
+**Terminal 2 (Client):**
+```bash
+./udp_tbolt_tester -c 127.0.0.1 -i lo0 -p 8888 -u -r 1000 -z 128 -d 5
+```
+
+Expected output: Client should show RTT statistics and throughput. Server will display received packet rates and bandwidth.
+
+### Real network interface testing
+Find your network interface:
+```bash
+ifconfig | grep "^[a-z]" | grep -v lo0
+```
+
+**Terminal 1 (Server on interface en5):**
+```bash
+sudo ./udp_tbolt_tester -s -i en5 -p 8888
+```
+
+**Terminal 2 (Client to server IP 192.168.2.2):**
+```bash
+./udp_tbolt_tester -c 192.168.2.2 -i en5 -p 8888 -r 2000 -z 1400 -u -d 10
+```
+
+### Verification checklist
+- ✓ Compilation succeeds without errors
+- ✓ Help message displays when run without arguments
+- ✓ Server starts and waits for packets
+- ✓ Client connects and sends packets
+- ✓ RTT statistics appear in client output
+- ✓ Server shows received packet rates
 
 License
 -------
